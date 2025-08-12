@@ -30,16 +30,13 @@ const CollaboratorsPage: React.FC = () => {
     fetchCollaborators();
   }, []);
 
-  const handleDeleteCollaborator = (email: string) => {
-    setCollaborators(prev => prev.filter(c => c.email !== email));
-  };
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
         <Typography variant="h5" fontWeight={700} color="#1A202C">Colaboradores</Typography>
         <NewCollaboratorButton onClick={handleNew} />
       </Box>
-      <CollaboratorsTable collaborators={collaborators} onDelete={handleDeleteCollaborator} />
+  <CollaboratorsTable collaborators={collaborators} />
     </Box>
   );
 };

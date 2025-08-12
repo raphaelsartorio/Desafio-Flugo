@@ -6,7 +6,8 @@ import {
 import type { SelectChangeEvent } from '@mui/material/Select';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../../firebase';
-import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import ConfirmDeleteDialog from './ConfirmDeleteDialog';
 
 const steps = ['Infos Básicas', 'Infos Profissionais'];
 
@@ -19,7 +20,6 @@ interface BasicInfo {
 
 interface ProfessionalInfo {
   department: string;
-  role: string;
 }
 
 
@@ -30,15 +30,14 @@ const initialBasicInfo: BasicInfo = {
 };
 
 const initialProfessionalInfo: ProfessionalInfo = {
-  department: '',
-  role: '',
+  department: ''
 };
 
 
 const DEPARTMENTS = [
-  'Engenharia',
-  'Recursos Humanos',
-  'Financeiro',
+  'Design',
+  'TI',
+  'Produto',
   'Marketing',
 ];
 
@@ -63,6 +62,7 @@ const CollaboratorMultiStepForm: React.FC<CollaboratorMultiStepFormProps> = ({ m
   const [basicInfo, setBasicInfo] = useState<BasicInfo>(initialBasicInfo);
   const [professionalInfo, setProfessionalInfo] = useState<ProfessionalInfo>(initialProfessionalInfo);
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [basicErrors, setBasicErrors] = useState<{ name?: string; email?: string }>({});
   const [profErrors, setProfErrors] = useState<{ department?: string }>({});
   const navigate = useNavigate();
@@ -76,8 +76,7 @@ const CollaboratorMultiStepForm: React.FC<CollaboratorMultiStepFormProps> = ({ m
         active: prefilled.status === 'Ativo',
       });
       setProfessionalInfo({
-        department: prefilled.department ?? '',
-        role: '',
+        department: prefilled.department ?? ''
       });
     }
   }, [mode, prefilled]);
@@ -150,6 +149,15 @@ const CollaboratorMultiStepForm: React.FC<CollaboratorMultiStepFormProps> = ({ m
   };
 
   const progress = (activeStep / (steps.length - 1)) * 50;
+  const handleBackToList = () => navigate('/colaboradores');
+  const handleOpenDelete = () => setDeleteDialogOpen(true);
+  const handleCloseDelete = () => setDeleteDialogOpen(false);
+  const handleConfirmDelete = async () => {
+    if (!docId) return;
+    await deleteDoc(doc(db, 'colaboradores', docId));
+    setDeleteDialogOpen(false);
+    (onDone ? onDone() : navigate('/colaboradores'));
+  };
 
   return (
     <Box>
@@ -183,10 +191,10 @@ const CollaboratorMultiStepForm: React.FC<CollaboratorMultiStepFormProps> = ({ m
             ))}
           </Stepper>
         </Box>
-        <Box flex={1} display="flex" flexDirection="column" justifyContent="flex-start" alignItems="stretch" px={0} py={0} height="100%">
+        <Box flex={1} display="flex" flexDirection="column" justifyContent="flex-start" alignItems="stretch" px={4} py={2} height="100%">
           {activeStep === 0 && (
-            <Box display="flex" flexDirection="column" flex={1} justifyContent="flex-start" alignItems="stretch" height="100%" gap={2}>
-              <Typography variant="h5" fontWeight={700} color="#4A5568" mb={1}>
+            <Box display="flex" flexDirection="column" flex={1} justifyContent="flex-start" alignItems="stretch" height="100%" gap={2} pb={8}>
+              <Typography variant="h5" fontWeight={600} color="#4A5568" mb={1} mt={2}>
                 Informações Básicas
               </Typography>
               <TextField
@@ -265,24 +273,19 @@ const CollaboratorMultiStepForm: React.FC<CollaboratorMultiStepFormProps> = ({ m
                     }}
                   />
                 }
-                label={<Typography fontWeight={500} color="#1A202C">Ativar ao criar</Typography>}
+                label={
+                  <Typography fontWeight={500} color="#1A202C">
+                    {mode === 'edit' ? 'Ativar' : 'Ativar ao criar'}
+                  </Typography>
+                }
                 sx={{ mt: 1 }}
               />
-              <Box display="flex" justifyContent="flex-end" width="100%">
-                <Button
-                  variant="contained"
-                  onClick={handleNext}
-                  sx={{backgroundColor: '#22c55e', borderRadius: 2, px: 5, fontWeight: 600, fontSize: 16, textTransform: 'none', boxShadow: '0 2px 8px #C6F6D5' }}
-                >
-                  Próximo
-                </Button>
-              </Box>
             </Box>
           )}
 
           {activeStep === 1 && (
-            <Box display="flex" flexDirection="column" flex={1} justifyContent="flex-start" alignItems="stretch" height="100%" gap={2}>
-              <Typography variant="h5" fontWeight={700} color="#4A5568" mb={1}>
+            <Box display="flex" flexDirection="column" flex={1} justifyContent="flex-start" alignItems="stretch" height="100%" gap={2} pb={8}>
+              <Typography variant="h5" fontWeight={600} color="#4A5568" mb={1} mt={2}>
                 Informações Profissionais
               </Typography>
               <FormControl fullWidth required error={!!profErrors.department} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}>
@@ -303,6 +306,10 @@ const CollaboratorMultiStepForm: React.FC<CollaboratorMultiStepFormProps> = ({ m
                   onChange={handleProfessionalChange}
                   inputProps={{ style: { fontSize: 18 } }}
                   sx={{
+                    '& .MuiSelect-select': {
+                      textAlign: 'left',
+                      justifyContent: 'flex-start',
+                    },
                     '& .MuiOutlinedInput-notchedOutline': {
                       borderColor: !profErrors.department && professionalInfo.department ? '#22C55E' : undefined,
                     },
@@ -322,30 +329,73 @@ const CollaboratorMultiStepForm: React.FC<CollaboratorMultiStepFormProps> = ({ m
                   <Typography color="error" fontSize={12} mt={0.5}>{profErrors.department}</Typography>
                 )}
               </FormControl>
-              <Box display="flex" justifyContent="space-between" width="100%">
-                <Button onClick={handleBack} sx={{ color: '#A0AEC0', fontWeight: 600, fontSize: 16, px: 3, borderRadius: 2, textTransform: 'none' }}>Voltar</Button>
-                <Button
-                  variant="contained"
-                  color="success"
-                  sx={{backgroundColor: '#22c55e', borderRadius: 2, px: 5, fontWeight: 600, fontSize: 16, textTransform: 'none', boxShadow: '0 2px 8px #C6F6D5' }}
-                  onClick={handleNext}
-                >
-                  Finalizar
-                </Button>
-                <Dialog open={successDialogOpen} onClose={() => { setSuccessDialogOpen(false); (onDone ? onDone() : navigate('/colaboradores')); }}>
-                  <DialogTitle>{mode === 'edit' ? 'Colaborador atualizado!' : 'Colaborador cadastrado!'}</DialogTitle>
-                  <DialogContent>
-                    <Typography>O colaborador foi {mode === 'edit' ? 'atualizado' : 'cadastrado'} com sucesso.</Typography>
-                  </DialogContent>
-                  <DialogActions>
-                    <Button onClick={() => { setSuccessDialogOpen(false); (onDone ? onDone() : navigate('/colaboradores')); }} variant="contained" color="success">
-                      OK
-                    </Button>
-                  </DialogActions>
-                </Dialog>
-              </Box>
             </Box>
           )}
+
+          <Box bgcolor="#fff" py={2} px={2}>
+            <Box display="flex" justifyContent="space-between" alignItems="center" gap={0}>
+              <Box display="flex" alignItems="center" gap={1.5}>
+                {activeStep !== 1 && (
+                  <Button onClick={handleBackToList} sx={{ color: '#A0AEC0', fontWeight: 600, fontSize: 16, px: 2.5, borderRadius: 2, textTransform: 'none' }}>
+                    Voltar
+                  </Button>
+                )}
+                {activeStep === 1 && (
+                  <Button onClick={handleBack} sx={{ color: '#A0AEC0', fontWeight: 600, fontSize: 16, px: 2.5, borderRadius: 2, textTransform: 'none' }}>
+                    Voltar
+                  </Button>
+                )}
+              </Box>
+              {activeStep === 0 ? (
+                <Button
+                  variant="contained"
+                  onClick={handleNext}
+                  sx={{ backgroundColor: '#22c55e', borderRadius: 2, px: 5, fontWeight: 600, fontSize: 16, textTransform: 'none' }}
+                >
+                  Próximo
+                </Button>
+              ) : (
+                <Box display="flex" alignItems="center" gap={1.5}>
+                  {mode === 'edit' && docId && (
+                    <Button
+                      color="error"
+                      onClick={handleOpenDelete}
+                      sx={{ fontWeight: 600, fontSize: 16, px: 2.5, borderRadius: 2, textTransform: 'none', }}
+                    >
+                      Excluir
+                    </Button>
+                  )}
+                  <Button
+                    variant="contained"
+                    color="success"
+                    sx={{ backgroundColor: '#22c55e', borderRadius: 2, px: 5, fontWeight: 600, fontSize: 16, textTransform: 'none' }}
+                    onClick={handleNext}
+                  >
+                    Concluir
+                  </Button>
+                </Box>
+              )}
+            </Box>
+          </Box>
+
+          <Dialog open={successDialogOpen} onClose={() => { setSuccessDialogOpen(false); (onDone ? onDone() : navigate('/colaboradores')); }}>
+            <DialogTitle>{mode === 'edit' ? 'Colaborador atualizado!' : 'Colaborador cadastrado!'}</DialogTitle>
+            <DialogContent>
+              <Typography>O colaborador foi {mode === 'edit' ? 'atualizado' : 'cadastrado'} com sucesso.</Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => { setSuccessDialogOpen(false); (onDone ? onDone() : navigate('/colaboradores')); }} variant="contained" color="success">
+                OK
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          <ConfirmDeleteDialog
+            open={deleteDialogOpen}
+            onClose={handleCloseDelete}
+            onDelete={handleConfirmDelete}
+            collaboratorName={prefilled?.name}
+          />
         </Box>
       </Paper>
     </Box>
