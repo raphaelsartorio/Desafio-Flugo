@@ -1,0 +1,4 @@
+- [x] Projeto criado com Vite, ReactJS, TypeScript e Material UI.
+- [x] Dependências instaladas.
+- [x] README.md atualizado com instruções de uso.
+- [ ] Personalize os componentes em `src/` para começar a desenvolver sua aplicação!
